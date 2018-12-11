@@ -12,6 +12,7 @@ PLUGIN_PATH=bin/$(PLUGIN_NAME)
 BENCHMARK_PROTOS = $(wildcard benchmark/protos/*.proto)
 
 TEST_PROTO_LIST = \
+	_leading_underscores \
 	google/protobuf/any \
 	google/protobuf/unittest_import \
 	google/protobuf/unittest_optimize_for \
@@ -24,6 +25,7 @@ TEST_PROTO_LIST = \
 	import_clash \
 	map_api \
 	map_api2 \
+	map_field \
 	mixins \
 	multiple_files_test \
 	nested_extension \

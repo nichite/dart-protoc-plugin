@@ -60,11 +60,15 @@ class MessageGenerator extends ProtobufContainer {
   // populated by resolve()
   List<ProtobufField> _fieldList;
 
-  MessageGenerator(DescriptorProto descriptor, ProtobufContainer parent,
-      Map<String, PbMixin> declaredMixins, PbMixin defaultMixin)
+  MessageGenerator(
+      DescriptorProto descriptor,
+      ProtobufContainer parent,
+      Map<String, PbMixin> declaredMixins,
+      PbMixin defaultMixin,
+      Set<String> usedNames)
       : _descriptor = descriptor,
         _parent = parent,
-        classname = messageOrEnumClassName(descriptor.name,
+        classname = messageOrEnumClassName(descriptor.name, usedNames,
             parent: parent?.classname ?? ''),
         assert(parent != null),
         fullName = parent.fullName == ''
@@ -73,16 +77,16 @@ class MessageGenerator extends ProtobufContainer {
         mixin = _getMixin(descriptor, parent.fileGen.descriptor, declaredMixins,
             defaultMixin) {
     for (EnumDescriptorProto e in _descriptor.enumType) {
-      _enumGenerators.add(new EnumGenerator(e, this));
+      _enumGenerators.add(new EnumGenerator(e, this, usedNames));
     }
 
     for (DescriptorProto n in _descriptor.nestedType) {
-      _messageGenerators
-          .add(new MessageGenerator(n, this, declaredMixins, defaultMixin));
+      _messageGenerators.add(new MessageGenerator(
+          n, this, declaredMixins, defaultMixin, usedNames));
     }
 
     for (FieldDescriptorProto x in _descriptor.extension) {
-      _extensionGenerators.add(new ExtensionGenerator(x, this));
+      _extensionGenerators.add(new ExtensionGenerator(x, this, usedNames));
     }
   }
 
@@ -213,6 +217,9 @@ class MessageGenerator extends ProtobufContainer {
     checkResolved();
 
     for (MessageGenerator m in _messageGenerators) {
+      // Don't output the generated map entry type. Instead, the `PbMap` type
+      // from the protobuf library is used to hold the keys and values.
+      if (m._descriptor.options.hasMapEntry()) continue;
       m.generate(out);
     }
 
@@ -381,8 +388,8 @@ class MessageGenerator extends ProtobufContainer {
     var names = field.memberNames;
 
     _emitOverrideIf(field.overridesGetter, out);
-    var getterExpr = _getterExpression(
-        fieldTypeString, field.index, defaultExpr, field.isRepeated);
+    final getterExpr = _getterExpression(fieldTypeString, field.index,
+        defaultExpr, field.isRepeated, field.isMapField);
     out.println('${fieldTypeString} get ${names.fieldName} => ${getterExpr};');
 
     if (field.isRepeated) {
@@ -421,8 +428,11 @@ class MessageGenerator extends ProtobufContainer {
     }
   }
 
-  String _getterExpression(
-      String fieldType, int index, String defaultExpr, bool isRepeated) {
+  String _getterExpression(String fieldType, int index, String defaultExpr,
+      bool isRepeated, bool isMapField) {
+    if (isMapField) {
+      return '\$_getMap($index)';
+    }
     if (fieldType == 'String') {
       return '\$_getS($index, $defaultExpr)';
     }
